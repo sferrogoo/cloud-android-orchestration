@@ -4,7 +4,7 @@ bazel_dep(name = "rules_shell", version = "0.6.1")
 git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 git_repository(
     name = "aosp_artifact",
-    commit = "9479ec22e5f0f12d55873c56980be5aad6fc2c75",
+    commit = "16268b707fc02ec3c5a21145f09efb1cf35d2972",
     remote = "https://github.com/google/android-cuttlefish.git",
     strip_prefix = "e2etests/orchestration/artifacts",
 )

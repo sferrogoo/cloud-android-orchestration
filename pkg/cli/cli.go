@@ -647,7 +647,7 @@ func createCommand(opts *subCommandOpts) *cobra.Command {
 	create.Flags().StringVar(
 		&createFlags.BuildAPICredentialsSource,
 		buildAPICredsSourceFlag,
-		"none",
+		opts.InitialConfig.DefaultService().BuildAPICredentialsSource,
 		"Source for the Build API OAuth2 credentials")
 	create.Flags().StringVar(
 		&createFlags.BuildAPIUserProjectID,

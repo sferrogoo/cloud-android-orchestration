@@ -80,7 +80,7 @@ func (c *Config) DefaultService() *Service {
 	} else if c.SystemDefaultService != "" {
 		return c.Services[c.SystemDefaultService]
 	}
-	return &Service{}
+	return &Service{BuildAPICredentialsSource: "none"}
 }
 
 func (c *Config) ConnectionControlDirExpanded() string {

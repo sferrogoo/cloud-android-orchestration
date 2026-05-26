@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -188,6 +189,13 @@ func (m *DockerInstanceManager) waitCreateHostOperation(host string) (*apiv1.Hos
 				return nil, fmt.Errorf("failed to inspect docker container: %w", err)
 			}
 			if res.State.Running {
+				client, err := m.GetHostClient("local", host)
+				if err != nil {
+					return nil, err
+				}
+				if err := waitForHostReady(client); err != nil {
+					return nil, err
+				}
 				return &apiv1.HostInstance{
 					Name: host,
 				}, nil
@@ -499,4 +507,19 @@ func (m *DockerInstanceManager) deleteDockerVolumeIfNeeded(ctx context.Context, 
 func (m *DockerInstanceManager) getRWMutex(user accounts.User) *sync.RWMutex {
 	mu, _ := m.mutexes.LoadOrStore(user.Username(), &sync.RWMutex{})
 	return mu.(*sync.RWMutex)
+}
+
+func waitForHostReady(client HostClient) error {
+	maxWait := 2 * time.Minute
+	retryDelay := 5 * time.Second
+	deadline := time.Now().Add(maxWait)
+
+	for time.Now().Before(deadline) {
+		status, err := client.Get("/", "", nil)
+		if err == nil && status != http.StatusBadGateway {
+			return nil
+		}
+		time.Sleep(retryDelay)
+	}
+	return errors.NewServiceUnavailableError("wait for host orchestrator timed out", nil)
 }

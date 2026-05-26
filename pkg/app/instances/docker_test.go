@@ -15,6 +15,8 @@
 package instances
 
 import (
+	"net/http"
+	"net/http/httputil"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -50,5 +52,55 @@ func TestDecodeOperationFailsMissingUnderscore(t *testing.T) {
 	_, _, err := DecodeOperationName("foobar")
 	if err == nil {
 		t.Errorf("expected error")
+	}
+}
+
+type mockHostClient struct {
+	getFunc func(string, string, *HostResponse) (int, error)
+}
+
+func (c *mockHostClient) Get(path, query string, res *HostResponse) (int, error) {
+	return c.getFunc(path, query, res)
+}
+
+func (c *mockHostClient) Post(path, query string, body any, res *HostResponse) (int, error) {
+	return 0, nil
+}
+
+func (c *mockHostClient) GetReverseProxy() *httputil.ReverseProxy {
+	return nil
+}
+
+func TestWaitForHostReadySucceeds(t *testing.T) {
+	client := &mockHostClient{
+		getFunc: func(path, query string, res *HostResponse) (int, error) {
+			return http.StatusOK, nil
+		},
+	}
+
+	err := waitForHostReady(client)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestWaitForHostReadyRetriesOnBadGateway(t *testing.T) {
+	calls := 0
+	client := &mockHostClient{
+		getFunc: func(path, query string, res *HostResponse) (int, error) {
+			calls++
+			if calls == 1 {
+				return http.StatusBadGateway, nil
+			}
+			return http.StatusOK, nil
+		},
+	}
+
+	err := waitForHostReady(client)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("expected 2 calls, got %d", calls)
 	}
 }

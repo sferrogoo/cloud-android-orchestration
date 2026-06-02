@@ -104,15 +104,6 @@ const (
 	buildIDFlag                = "build_id"
 	buildTargetFlag            = "build_target"
 	localImageFlag             = "local_image"
-	kernelBranchFlag           = "kernel_branch"
-	kernelBuildIDFlag          = "kernel_build_id"
-	kernelBuildTargetFlag      = "kernel_build_target"
-	bootloaderBranchFlag       = "bootloader_branch"
-	bootloaderBuildIDFlag      = "bootloader_build_id"
-	bootloaderBuildTargetFlag  = "bootloader_build_target"
-	systemImgBranchFlag        = "system_branch"
-	systemImgBuildIDFlag       = "system_build_id"
-	systemImgBuildTargetFlag   = "system_build_target"
 	numInstancesFlag           = "num_instances"
 	connectAgentFlag           = "connect_agent"
 	autoConnectFlag            = "auto_connect"
@@ -606,33 +597,13 @@ func createCommand(opts *subCommandOpts) *cobra.Command {
 		},
 	}
 	create.Flags().StringVar(&createFlags.Host, hostFlag, "", "Specifies the host. Creates a new host when it's not specified")
-	// Main build flags.
+	// Remote build flags.
 	create.Flags().StringVar(&createFlags.MainBuild.Branch, branchFlag, "aosp-main", "The branch name")
 	create.Flags().StringVar(&createFlags.MainBuild.BuildID, buildIDFlag, "", "Android build identifier")
 	create.Flags().StringVar(&createFlags.MainBuild.Target, buildTargetFlag, "aosp_cf_x86_64_phone-trunk_staging-userdebug",
 		"Android build target")
 	create.MarkFlagsMutuallyExclusive(branchFlag, buildIDFlag)
-	// Kernel build flags
-	create.Flags().StringVar(&createFlags.KernelBuild.Branch, kernelBranchFlag, "", "Kernel branch name")
-	create.Flags().StringVar(&createFlags.KernelBuild.BuildID, kernelBuildIDFlag, "", "Kernel build identifier")
-	create.Flags().StringVar(&createFlags.KernelBuild.Target, kernelBuildTargetFlag, "", "Kernel build target")
-	create.MarkFlagsMutuallyExclusive(kernelBranchFlag, kernelBuildIDFlag)
-	// Bootloader build flags
-	create.Flags().StringVar(&createFlags.BootloaderBuild.Branch, bootloaderBranchFlag, "", "Bootloader branch name")
-	create.Flags().StringVar(&createFlags.BootloaderBuild.BuildID, bootloaderBuildIDFlag, "", "Bootloader build identifier")
-	create.Flags().StringVar(&createFlags.BootloaderBuild.Target, bootloaderBuildTargetFlag, "", "Bootloader build target")
-	create.MarkFlagsMutuallyExclusive(bootloaderBranchFlag, bootloaderBuildIDFlag)
-	// System image build flags
-	create.Flags().StringVar(&createFlags.SystemImgBuild.Branch, systemImgBranchFlag, "", "System image branch name")
-	create.Flags().StringVar(&createFlags.SystemImgBuild.BuildID, systemImgBuildIDFlag, "", "System image build identifier")
-	create.Flags().StringVar(&createFlags.SystemImgBuild.Target, systemImgBuildTargetFlag, "", "System image build target")
-	create.MarkFlagsMutuallyExclusive(systemImgBranchFlag, systemImgBuildIDFlag)
-	remoteBuildFlags := []string{
-		branchFlag, buildIDFlag, buildTargetFlag,
-		kernelBranchFlag, kernelBuildIDFlag, kernelBuildTargetFlag,
-		bootloaderBranchFlag, bootloaderBuildIDFlag, bootloaderBuildTargetFlag,
-		systemImgBranchFlag, systemImgBuildIDFlag, systemImgBuildTargetFlag,
-	}
+	remoteBuildFlags := []string{branchFlag, buildIDFlag, buildTargetFlag}
 	// Local image
 	create.Flags().BoolVar(&createFlags.LocalImage, localImageFlag, false,
 		"Create instance from a local build, the required files are https://cs.android.com/android/platform/superproject/+/master:device/google/cuttlefish/required_images and cvd-host-packages.tar.gz")

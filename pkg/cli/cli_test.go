@@ -104,30 +104,6 @@ func TestCommandSucceeds(t *testing.T) {
 			ExpOut: "",
 		},
 		{
-			Name: "create",
-			Args: []string{"create", "--build_id=123"},
-			ExpOut: expectedOutput(unitTestServiceURL, "foo", &hoapi.CVD{
-				Group:          "cvd-1",
-				Name:           "1",
-				Status:         "Running",
-				Displays:       []string{"720 x 1280 (320)"},
-				WebRTCDeviceID: "cvd-1-1",
-				ADBSerial:      "0.0.0.0:6520",
-			}, 12345),
-		},
-		{
-			Name: "create with --host",
-			Args: []string{"create", "--host=bar", "--build_id=123"},
-			ExpOut: expectedOutput(unitTestServiceURL, "bar", &hoapi.CVD{
-				Group:          "cvd-1",
-				Name:           "1",
-				Status:         "Running",
-				Displays:       []string{"720 x 1280 (320)"},
-				WebRTCDeviceID: "cvd-1-1",
-				ADBSerial:      "0.0.0.0:6520",
-			}, 12345),
-		},
-		{
 			Name: "list",
 			Args: []string{"list"},
 			ExpOut: expectedOutput(unitTestServiceURL, "foo", nil, 0) +

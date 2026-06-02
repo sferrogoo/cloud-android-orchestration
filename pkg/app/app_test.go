@@ -413,11 +413,7 @@ func TestHostForwarderInjectCredentialsUsingHTTPHeader(t *testing.T) {
 
 func TestHostForwarderDoesNotInjectCredentials(t *testing.T) {
 	reqURL := "http://test.com/v1/zones/foo/hosts/bar/cvds"
-	msg, _ := json.Marshal(&hoapi.CreateCVDRequest{
-		CVD: &hoapi.CVD{
-			Name: "cvdname",
-		},
-	})
+	msg, _ := json.Marshal(&hoapi.CreateCVDRequest{})
 	credentials := "abcdef"
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

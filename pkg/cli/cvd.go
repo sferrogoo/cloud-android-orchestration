@@ -83,13 +83,29 @@ type CreateCVDLocalOpts struct {
 	LocalImagesZipSrc  string
 }
 
+// Represents a build from ci.android.com.
+type AndroidCIBuild struct {
+	// The branch name. If omitted the passed `BuildID` will determine the branch.
+	Branch string
+	// Uniquely identifies a branch's snapshot. If empty, the latest green snapshot of the used branch will
+	// be used.
+	BuildID string
+	// A string to determine the specific device product and flavor
+	Target string
+}
+
+func (b *AndroidCIBuild) EnvConfigURI() string {
+	branch := b.Branch
+	if b.BuildID != "" {
+		branch = b.BuildID
+	}
+	return fmt.Sprintf("@ab/%s/%s", branch, b.Target)
+}
+
 type CreateCVDOpts struct {
-	Host            string
-	MainBuild       hoapi.AndroidCIBuild
-	KernelBuild     hoapi.AndroidCIBuild
-	BootloaderBuild hoapi.AndroidCIBuild
-	SystemImgBuild  hoapi.AndroidCIBuild
-	LocalImage      bool
+	Host       string
+	MainBuild  AndroidCIBuild
+	LocalImage bool
 	// Creates multiple instances. Only relevant if given a single build source.
 	NumInstances int
 	// TODO(b/378123925): Work with https://github.com/google/android-cuttlefish/blob/main/base/cvd/cuttlefish/host/commands/cvd/cli/parser/load_config.proto
@@ -159,7 +175,7 @@ func (c *cvdCreator) Create() ([]*hoapi.CVD, error) {
 	if !c.opts.CreateCVDLocalOpts.empty() {
 		return c.createCVDFromLocalSrcs()
 	}
-	return c.createCVDFromAndroidCI()
+	return c.createWithOpts()
 }
 
 var uaEnvConfigTmpl *template.Template
@@ -262,13 +278,6 @@ const (
 	stateMsgStartCVD        = "Starting and waiting for boot complete"
 	stateMsgFetchAndStart   = "Fetching, starting and waiting for boot complete"
 )
-
-func (c *cvdCreator) createCVDFromAndroidCI() ([]*hoapi.CVD, error) {
-	if c.opts.EnvConfig != nil {
-		return c.createWithCanonicalConfig()
-	}
-	return c.createWithOpts()
-}
 
 func (c *cvdCreator) createWithCanonicalConfig() ([]*hoapi.CVD, error) {
 	hostSrv := c.client.HostClient(c.opts.Host)
@@ -386,46 +395,12 @@ func (c *cvdCreator) uploadImagesAndUpdateEnvConfig(client hoclient.HostOrchestr
 }
 
 func (c *cvdCreator) createWithOpts() ([]*hoapi.CVD, error) {
-	var mainBuild, kernelBuild, bootloaderBuild, systemImageBuild *hoapi.AndroidCIBuild
-	mainBuild = &c.opts.MainBuild
-	if c.opts.KernelBuild != (hoapi.AndroidCIBuild{}) {
-		kernelBuild = &c.opts.KernelBuild
-	}
-	if c.opts.BootloaderBuild != (hoapi.AndroidCIBuild{}) {
-		bootloaderBuild = &c.opts.BootloaderBuild
-	}
-	if c.opts.SystemImgBuild != (hoapi.AndroidCIBuild{}) {
-		systemImageBuild = &c.opts.SystemImgBuild
-	}
-	fetchReq := &hoapi.FetchArtifactsRequest{
-		AndroidCIBundle: &hoapi.AndroidCIBundle{Build: mainBuild, Type: hoapi.MainBundleType},
-	}
-	c.statePrinter.Print(stateMsgFetchMainBundle)
-	fetchMainBuildRes, err := c.client.HostClient(c.opts.Host).FetchArtifacts(fetchReq, c.credentialsFactory())
-	c.statePrinter.PrintDone(stateMsgFetchMainBundle, err)
+	envConfig, err := buildUAEnvConfig([]string{c.opts.MainBuild.EnvConfigURI()}, c.opts.MainBuild.EnvConfigURI(), c.opts.NumInstances)
 	if err != nil {
 		return nil, err
 	}
-	createReq := &hoapi.CreateCVDRequest{
-		CVD: &hoapi.CVD{
-			BuildSource: &hoapi.BuildSource{
-				AndroidCIBuildSource: &hoapi.AndroidCIBuildSource{
-					MainBuild:        fetchMainBuildRes.AndroidCIBundle.Build,
-					KernelBuild:      kernelBuild,
-					BootloaderBuild:  bootloaderBuild,
-					SystemImageBuild: systemImageBuild,
-				},
-			},
-		},
-		AdditionalInstancesNum: c.opts.AdditionalInstancesNum(),
-	}
-	c.statePrinter.Print(stateMsgStartCVD)
-	res, err := c.client.HostClient(c.opts.Host).CreateCVD(createReq, c.credentialsFactory())
-	c.statePrinter.PrintDone(stateMsgStartCVD, err)
-	if err != nil {
-		return nil, err
-	}
-	return res.CVDs, nil
+	c.opts.EnvConfig = envConfig
+	return c.createWithCanonicalConfig()
 }
 
 func (c *cvdCreator) createCVDFromLocalSrcs() ([]*hoapi.CVD, error) {

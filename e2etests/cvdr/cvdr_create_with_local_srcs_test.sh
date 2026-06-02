@@ -24,6 +24,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+echo "HERE"
+
 cvdr create \
     --host=${HOSTNAME} \
     --local_cvd_host_pkg_src=${CVD_HOST_PKG} \

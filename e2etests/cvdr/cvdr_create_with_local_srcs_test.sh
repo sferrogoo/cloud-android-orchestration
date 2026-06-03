@@ -24,11 +24,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cvdr create \
-    --host=${HOSTNAME} \
-    --local_cvd_host_pkg_src=${CVD_HOST_PKG} \
-    --local_images_zip_src=${IMAGE_ZIP}
+out=$(cvdr create \
+  --host=${HOSTNAME} \
+  --local_cvd_host_pkg_src=${CVD_HOST_PKG} \
+  --local_images_zip_src=${IMAGE_ZIP})
 
-# Check ADB connection
-# TODO(b/448209030): Retrieve serial of the device from the output of cvdr list.
-adb shell uptime
+verify_adb_connection "${out}"

@@ -13,11 +13,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cvdr create \
-    --host=${HOSTNAME} \
-    --branch=aosp-android-latest-release \
-    --build_target=aosp_cf_x86_64_only_phone-userdebug
+out=$(cvdr create \
+  --host=${HOSTNAME} \
+  --branch=aosp-android-latest-release \
+  --build_target=aosp_cf_x86_64_only_phone-userdebug)
 
-# Check ADB connection
-# TODO(b/448209030): Retrieve serial of the device from the output of cvdr list.
-adb shell uptime
+verify_adb_connection "${out}"

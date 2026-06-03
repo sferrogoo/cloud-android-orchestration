@@ -16,3 +16,15 @@ function validate_components() {
 function cvdr() {
     HOME=${PWD} CVDR_USER_CONFIG_PATH=${CVDR_CONFIG_PATH} ${CVDR_PATH} "$@"
 }
+
+
+function verify_adb_connection() {
+  # TODO(b/448209030): Retrieve serial of the device from the output of cvdr list.
+  local cvdr_create_output="${1}"
+  adb_serial=$(echo -e "${cvdr_create_output}" | grep "ADB:" | grep -oE "[^ ]+$")
+  if [[ -z "${adb_serial}" ]]; then
+    echo "Device is not adb connected"
+    exit 1
+  fi
+  timeout 30s adb -s ${adb_serial} wait-for-device
+}

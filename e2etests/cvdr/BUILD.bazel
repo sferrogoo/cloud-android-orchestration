@@ -27,3 +27,9 @@ sh_test(
         "@aosp_artifact//:images_zip",
     ],
 )
+
+sh_test(
+    name = "cvdr_create_with_env_config_test",
+    srcs = ["cvdr_create_with_env_config_test.sh"],
+    data = [":cvdr_common_utils"],
+)

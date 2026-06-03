@@ -175,6 +175,9 @@ func (c *cvdCreator) Create() ([]*hoapi.CVD, error) {
 	if !c.opts.CreateCVDLocalOpts.empty() {
 		return c.createCVDFromLocalSrcs()
 	}
+	if c.opts.EnvConfig != nil {
+		return c.createWithCanonicalConfig()
+	}
 	return c.createWithOpts()
 }
 

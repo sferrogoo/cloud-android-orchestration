@@ -131,7 +131,7 @@ func (m *GCEInstanceManager) CreateHost(zone string, req *apiv1.CreateHostReques
 		Disks: []*compute.AttachedDisk{
 			{
 				InitializeParams: &compute.AttachedDiskInitializeParams{
-					SourceImage: m.Config.GCP.HostImageFamily,
+					SourceSnapshot: "projects/sdv-pdk-test-project1/global/snapshots/snap-cuttlefish-golden-v1",
 				},
 				Boot:       true,
 				AutoDelete: true,

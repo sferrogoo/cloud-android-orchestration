@@ -391,6 +391,7 @@ func (c *cvdCreator) uploadImagesAndUpdateEnvConfig(client hoclient.HostOrchestr
 			if err != nil {
 				return fmt.Errorf("failed uploading %q: %w", images, err)
 			}
+			fmt.Printf("DEBUG: uploadImages: imageDirID = %q\n", imageDirID)
 			diskMap["default_build"] = "@image_dirs/" + imageDirID
 		}
 	}
@@ -684,6 +685,7 @@ func uploadFilesAndCreateImageDir(client hoclient.HostOrchestratorClient, filena
 		return "", fmt.Errorf("failed to create image directory: %w", err)
 	}
 	imageDirID := res.ID
+	fmt.Printf("DEBUG: uploadFilesAndCreateImageDir: CreateImageDirectory returned ID = %q\n", imageDirID)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var merr error
@@ -720,9 +722,10 @@ func uploadFilesAndCreateImageDir(client hoclient.HostOrchestratorClient, filena
 	statePrinter.PrintDone(msg, merr)
 
 	if merr != nil {
-		return "", err
+		return "", merr
 	}
 
+	fmt.Printf("DEBUG: uploadFilesAndCreateImageDir: returning ID = %q\n", imageDirID)
 	return imageDirID, nil
 }
 

@@ -132,7 +132,7 @@ func (c *clientImpl) CreateHost(req *apiv1.CreateHostRequest) (*apiv1.HostInstan
 	retryOpts := hoclient.RetryOptions{
 		StatusCodes: []int{http.StatusBadGateway},
 		RetryDelay:  5 * time.Second,
-		MaxWait:     2 * time.Minute,
+		MaxWait:     5 * time.Minute,
 	}
 	hostPath := fmt.Sprintf("/hosts/%s/", ins.Name)
 	if err := c.httpHelper.NewGetRequest(hostPath).JSONResDoWithRetries(nil, retryOpts); err != nil {
@@ -174,7 +174,7 @@ func (c *clientImpl) waitForOperation(op *apiv1.Operation, res any) error {
 	retryOpts := hoclient.RetryOptions{
 		StatusCodes: []int{http.StatusServiceUnavailable},
 		RetryDelay:  5 * time.Second,
-		MaxWait:     2 * time.Minute,
+		MaxWait:     10 * time.Minute,
 	}
 	return c.httpHelper.NewPostRequest(path, nil).JSONResDoWithRetries(res, retryOpts)
 }

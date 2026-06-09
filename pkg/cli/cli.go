@@ -337,11 +337,11 @@ func cvdOutput(w io.Writer, h *RemoteHost, c *RemoteCVD) {
 
 func adbStateStr(c *RemoteCVD) string {
 	if c.ConnStatus != nil {
-		if c.ConnStatus.ADB.Port > 0 {
+		state := c.ConnStatus.ADB.State
+		if state == "ready" || state == "connected" {
 			return fmt.Sprintf("127.0.0.1:%d", c.ConnStatus.ADB.Port)
-		} else {
-			return c.ConnStatus.ADB.State
 		}
+		return state
 	}
 	return "not connected"
 }

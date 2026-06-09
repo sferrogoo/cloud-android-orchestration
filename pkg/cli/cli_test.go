@@ -19,6 +19,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -42,6 +45,7 @@ func TestRequiredFlags(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
+			resetFakeClients()
 			io, _, _ := newTestIOStreams()
 			opts := &CommandOptions{
 				IOStreams:      io,
@@ -69,7 +73,7 @@ type fakeCommandRunner struct{}
 
 func (*fakeCommandRunner) StartBgCommand(...string) ([]byte, error) {
 	// The only command started for now is the connection agent.
-	return json.Marshal(&ConnStatus{ADB: ForwarderState{Port: 12345}})
+	return json.Marshal(&ConnStatus{ADB: ForwarderState{Port: 12345, State: "ready"}})
 }
 
 type fakeADBServerProxy struct{}
@@ -117,6 +121,7 @@ func TestCommandSucceeds(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
+			resetFakeClients()
 			ioStreams, _, out := newTestIOStreams()
 			opts := &CommandOptions{
 				IOStreams:      ioStreams,
@@ -195,9 +200,13 @@ func expectedOutput(serviceURL, host string, cvd *hoapi.CVD, port int) string {
 	cvds := []*RemoteCVD{}
 	if cvd != nil {
 		remoteCVD := NewRemoteCVD(host, cvd)
+		state := "not connected"
+		if port > 0 {
+			state = "ready"
+		}
 		remoteCVD.ConnStatus = &ConnStatus{
 			ADB: ForwarderState{
-				State: "not connected",
+				State: state,
 				Port:  port,
 			},
 		}
@@ -207,4 +216,118 @@ func expectedOutput(serviceURL, host string, cvd *hoapi.CVD, port int) string {
 	WriteListCVDsOutput(out, hosts)
 	b, _ := io.ReadAll(out)
 	return string(b)
+}
+
+func runMockAgent(t *testing.T, controlDir string, cvd RemoteCVDLocator, status ConnStatus) io.Closer {
+	socketPath := filepath.Join(controlDir, fmt.Sprintf("%d.sock", status.ADB.Port))
+	listener, err := net.Listen("unixpacket", socketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buff := make([]byte, 100)
+				n, err := c.Read(buff)
+				if err != nil {
+					return
+				}
+				cmd := string(buff[:n])
+				if cmd == "status" {
+					reply := StatusCmdRes{
+						CVD:    cvd,
+						Status: status,
+					}
+					msg, _ := json.Marshal(reply)
+					c.Write(msg)
+				}
+			}(conn)
+		}
+	}()
+
+	return listener
+}
+
+func TestListWithConnectionStatus(t *testing.T) {
+	resetFakeClients()
+	
+	// 1. Pre-populate fake client with a CVD on host "foo"
+	fc := getFakeHostClient("foo")
+	_, err := fc.CreateCVD(&hoapi.CreateCVDRequest{CVD: &hoapi.CVD{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	controlDir := t.TempDir()
+
+	// 2. Start a mock agent with "ready" state on port 12345
+	cvd := RemoteCVDLocator{Host: "foo", Group: "cvd-1", Name: "1", WebRTCDeviceID: "cvd-1-1"}
+	statusReady := ConnStatus{ADB: ForwarderState{Port: 12345, State: "ready"}}
+	agentReady := runMockAgent(t, controlDir, cvd, statusReady)
+	defer agentReady.Close()
+
+	// Run list command
+	ioStreams, _, out := newTestIOStreams()
+	opts := &CommandOptions{
+		IOStreams:      ioStreams,
+		Args:           []string{"list", "--service_url=" + unitTestServiceURL},
+		InitialConfig:  Config{ConnectionControlDir: controlDir},
+		CommandRunner:  &fakeCommandRunner{},
+		ADBServerProxy: &fakeADBServerProxy{},
+	}
+
+	err = NewCVDRemoteCommand(opts).Execute()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outputBytes, _ := io.ReadAll(out)
+	output := string(outputBytes)
+
+	// Verify output contains the port
+	expectedOutputReady := "127.0.0.1:12345"
+	if !strings.Contains(output, expectedOutputReady) {
+		t.Errorf("expected output to contain %q, got:\n%s", expectedOutputReady, output)
+	}
+
+	// 3. Start another mock agent with "failed" state on port 12346
+	statusFailed := ConnStatus{ADB: ForwarderState{Port: 12346, State: "failed"}}
+	agentFailed := runMockAgent(t, controlDir, cvd, statusFailed)
+	defer agentFailed.Close()
+
+	agentReady.Close()
+	os.Remove(filepath.Join(controlDir, "12345.sock"))
+
+	// Now run list command again with only the failed agent
+	ioStreams2, _, out2 := newTestIOStreams()
+	opts2 := &CommandOptions{
+		IOStreams:      ioStreams2,
+		Args:           []string{"list", "--service_url=" + unitTestServiceURL},
+		InitialConfig:  Config{ConnectionControlDir: controlDir},
+		CommandRunner:  &fakeCommandRunner{},
+		ADBServerProxy: &fakeADBServerProxy{},
+	}
+
+	err = NewCVDRemoteCommand(opts2).Execute()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outputBytes2, _ := io.ReadAll(out2)
+	output2 := string(outputBytes2)
+
+	// Verify output contains "failed" instead of port
+	expectedOutputFailed := "failed"
+	if !strings.Contains(output2, expectedOutputFailed) {
+		t.Errorf("expected output to contain %q, got:\n%s", expectedOutputFailed, output2)
+	}
+	if strings.Contains(output2, "12346") {
+		t.Errorf("expected output NOT to contain port 12346, got:\n%s", output2)
+	}
 }

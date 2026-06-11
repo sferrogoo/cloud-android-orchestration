@@ -34,6 +34,7 @@ const GCEIMType IMType = "GCP"
 
 type GCPIMConfig struct {
 	ProjectID            string
+        HostSnapshot         string
 	HostImageFamily      string
 	HostOrchestratorPort int
 	Network              string
@@ -83,6 +84,7 @@ func (m *GCEInstanceManager) GetHostAddr(zone string, host string) (string, erro
 	if err != nil {
 		return "", err
 	}
+	// Internal IP is preferred when using VPC connector.
 	ilen := len(instance.NetworkInterfaces)
 	if ilen == 0 {
 		log.Printf("host instance %s in zone %s is missing a network interface", host, zone)
@@ -91,7 +93,9 @@ func (m *GCEInstanceManager) GetHostAddr(zone string, host string) (string, erro
 	if ilen > 1 {
 		log.Printf("host instance %s in zone %s has %d network interfaces", host, zone, ilen)
 	}
-	return instance.NetworkInterfaces[0].NetworkIP, nil
+	addr := instance.NetworkInterfaces[0].NetworkIP
+	log.Printf("Using internal IP %s for host %s (UseExternalIP=%v)", addr, host, m.Config.GCP.UseExternalIP)
+	return addr, nil
 }
 
 func (m *GCEInstanceManager) GetHostURL(zone string, host string) (*url.URL, error) {
@@ -99,7 +103,8 @@ func (m *GCEInstanceManager) GetHostURL(zone string, host string) (*url.URL, err
 	if err != nil {
 		return nil, err
 	}
-	return url.Parse(fmt.Sprintf("%s://%s:%d", m.Config.HostOrchestratorProtocol, addr, m.Config.GCP.HostOrchestratorPort))
+	port := 443
+	return url.Parse(fmt.Sprintf("%s://%s:%d", m.Config.HostOrchestratorProtocol, addr, port))
 }
 
 const operationStatusDone = "DONE"
@@ -132,6 +137,7 @@ func (m *GCEInstanceManager) CreateHost(zone string, req *apiv1.CreateHostReques
 			{
 				InitializeParams: &compute.AttachedDiskInitializeParams{
 					SourceImage: m.Config.GCP.HostImageFamily,
+                                        SourceSnapshot: m.Config.GCP.HostSnapshot,
 				},
 				Boot:       true,
 				AutoDelete: true,
@@ -146,6 +152,9 @@ func (m *GCEInstanceManager) CreateHost(zone string, req *apiv1.CreateHostReques
 		},
 		Labels: map[string]string{
 			labelCreatedBy: user.Username(),
+		},
+		Tags: &compute.Tags{
+			Items: []string{"coast-orchestrator-host"},
 		},
 	}
 	if req.HostInstance.GCP.BootDiskSizeGB != 0 {
@@ -164,9 +173,11 @@ func (m *GCEInstanceManager) CreateHost(zone string, req *apiv1.CreateHostReques
 			OnHostMaintenance: "TERMINATE",
 		}
 	}
-	if m.Config.GCP.AcloudCompatible {
-		payload.Labels[labelAcloudCreatedBy] = user.Username()
+	if m.Config.GCP.AcloudCompatible || m.Config.GCP.UseExternalIP {
 		startupScript := acloudSetupScript
+		if m.Config.GCP.AcloudCompatible {
+			payload.Labels[labelAcloudCreatedBy] = user.Username()
+		}
 		payload.Metadata = &compute.Metadata{
 			Items: []*compute.MetadataItems{
 				{
@@ -384,7 +395,10 @@ sudo usermod -a -G cvdnetwork vsoc-01
 # Creates symlink for cuttlefish_runtime.
 sudo -u vsoc-01 ln -s -f /var/lib/cuttlefish-common/runtimes/cuttlefish_runtime /home/vsoc-01
 # Creates bin directory
-sudo -u vsoc-01 mkdir /home/vsoc-01/bin
+sudo -u vsoc-01 mkdir -p /home/vsoc-01/bin
+# Port forwarding for external connectivity
+apt-get update && apt-get install -y socat
+socat TCP4-LISTEN:443,fork TCP4:127.0.0.1:2081 &
 # Creates restart_cvd wrapper
 sudo -u vsoc-01 touch /home/vsoc-01/bin/restart_cvd
 printf '#!/bin/bash\nHOME=/var/lib/cuttlefish-common/runtimes /var/lib/cuttlefish-common/artifacts/acloud_link/bin/restart_cvd\n' | sudo -u vsoc-01 tee /home/vsoc-01/bin/restart_cvd >/dev/null

@@ -48,10 +48,10 @@ resource "google_project_service_identity" "iap" {
 data "google_project" "project" {
 }
 
-resource "google_compute_project_metadata_item" "disable-oslogin" {
-  key   = "enable-oslogin"
-  value = "FALSE"
-}
+#resource "google_compute_project_metadata_item" "disable-oslogin" {
+#  key   = "enable-oslogin"
+#  value = "FALSE"
+#}
 
 resource "google_artifact_registry_repository" "my-repo" {
   location      = var.region
@@ -64,7 +64,7 @@ resource "google_artifact_registry_repository" "my-repo" {
 
 // Secret Manager
 resource "google_secret_manager_secret" "co-config" {
-  secret_id = "cloud-orchestrator-config"
+  secret_id = "coast-orchestrator-config"
 
   replication {
     auto {}
@@ -120,7 +120,7 @@ module "lb-http" {
   name    = var.lb_name
   project = var.project_id
 
-  load_balancing_scheme           = "EXTERNAL_MANAGED"
+  load_balancing_scheme           = "INTERNAL_MANAGED"
   ssl                             = true
   managed_ssl_certificate_domains = [var.domain]
   http_forward                    = false
@@ -153,7 +153,7 @@ module "lb-http" {
 
 resource "google_compute_region_network_endpoint_group" "serverless_neg" {
   provider              = google-beta
-  name                  = "serverless-neg"
+  name                  = "coast-serverless-neg"
   network_endpoint_type = "SERVERLESS"
   region                = var.region
   cloud_run {
@@ -165,7 +165,7 @@ resource "google_compute_region_network_endpoint_group" "serverless_neg" {
 }
 
 resource "google_service_account" "service_account" {
-  account_id   = "cloud-orchestrator"
+  account_id   = "coast-orchestrator-sa"
   display_name = "Service Account used for Cloud Orchestrator"
   depends_on = [
     google_project_service.apis
@@ -193,7 +193,7 @@ resource "google_project_iam_member" "member" {
 
 # Networking
 resource "google_compute_network" "network" {
-  name                    = "co-network"
+  name                    = "coast-network"
   auto_create_subnetworks = false
   depends_on = [
     google_project_service.apis
@@ -201,7 +201,7 @@ resource "google_compute_network" "network" {
 }
 
 resource "google_compute_subnetwork" "subnetwork" {
-  name          = "test-subnetwork"
+  name          = "coast-subnetwork"
   ip_cidr_range = "10.2.0.0/16"
   region        = var.region
   network       = google_compute_network.network.id
@@ -209,7 +209,7 @@ resource "google_compute_subnetwork" "subnetwork" {
 
 resource "google_vpc_access_connector" "connector" {
   region        = var.region
-  name          = var.serverless_connector_name
+  name          = "coast-vpc-connector"
   ip_cidr_range = "10.8.0.0/28"
   network       = google_compute_network.network.id
 }
@@ -227,7 +227,7 @@ module "cloud-nat" {
 
 # Firewall
 resource "google_compute_firewall" "default" {
-  name    = "allow-cloud-orchestrator"
+  name    = "coast-allow-cloud-orchestrator"
   network = google_compute_network.network.name
 
   allow {
@@ -257,4 +257,13 @@ resource "local_file" "build_and_deploy" {
     OAUTH_CLIENT_ID      = google_iap_client.project_client.client_id,
   })
   filename = "${path.root}/build-and-deploy.sh"
+}
+
+resource "google_compute_subnetwork" "proxy_only" {
+  name          = "coast-proxy-only-subnet"
+  ip_cidr_range = "10.129.0.0/23"
+  purpose       = "REGIONAL_MANAGED_PROXY"
+  role          = "ACTIVE"
+  region        = var.region
+  network       = google_compute_network.network.id
 }

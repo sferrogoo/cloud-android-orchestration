@@ -175,6 +175,9 @@ func (c *cvdCreator) Create() ([]*hoapi.CVD, error) {
 	if !c.opts.CreateCVDLocalOpts.empty() {
 		return c.createCVDFromLocalSrcs()
 	}
+	if len(c.opts.EnvConfig) > 0 {
+		return c.createWithCanonicalConfig()
+	}
 	return c.createWithOpts()
 }
 
@@ -637,9 +640,6 @@ func verifyCVDHostPackageTar(dir string) error {
 }
 
 func (o *CreateCVDLocalOpts) validate() error {
-	if o.LocalBootloaderSrc == "" && o.LocalImagesZipSrc == "" {
-		return errors.New("missing bootloader source")
-	}
 	if o.LocalCVDHostPkgSrc == "" {
 		return errors.New("missing cvd host package source")
 	}
@@ -717,7 +717,7 @@ func uploadFilesAndCreateImageDir(client hoclient.HostOrchestratorClient, filena
 	statePrinter.PrintDone(msg, merr)
 
 	if merr != nil {
-		return "", err
+		return "", merr
 	}
 
 	return imageDirID, nil

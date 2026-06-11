@@ -1,11 +1,8 @@
 WebStaticFilesPath = "web"
-
-# List of allowed origins
-# e.g. "https://localhost:8080"
 CORSAllowedOrigins = []
 
 [AccountManager]
-Type = "unix"
+Type = "username-only"
 
 [AccountManager.OAuth2]
 Provider = "Google"
@@ -22,7 +19,6 @@ SecretFilePath = "../secrets.json"
 
 [EncryptionService]
 Type = "Fake"
-
 [EncryptionService.GCP_KMS]
 KeyName = ""
 
@@ -30,20 +26,21 @@ KeyName = ""
 Type = "InMemory"
 
 [DatabaseService.Spanner]
-DatabaseName = "projects/<project id>/instances/<instance id>/databases/<database>"
+DatabaseName = "projects/sdv-pdk-test-project1/instances/coast-db/databases/coast-db"
 
 [InstanceManager]
-Type = "unix"
+Type = "GCP"
 HostOrchestratorProtocol = "http"
 AllowSelfSignedHostSSLCertificate = true
 
 [InstanceManager.GCP]
-ProjectId = ""
+ProjectID = "sdv-pdk-test-project1"
 HostImageFamily = ""
-HostOrchestratorPort = 1080
-
-[InstanceManager.UNIX]
-HostOrchestratorPort = 2080
+HostSnapshot = "projects/sdv-pdk-test-project1/global/snapshots/cf-functional-snapshot-2"
+HostOrchestratorPort = 2081
+Network = "projects/sdv-pdk-test-project1/global/networks/coast-network"
+Subnetwork = "projects/sdv-pdk-test-project1/regions/us-central1/subnetworks/coast-subnetwork"
+UseExternalIP = true
 
 [[WebRTC.IceServers]]
 URLs = ["stun:stun.l.google.com:19302"]

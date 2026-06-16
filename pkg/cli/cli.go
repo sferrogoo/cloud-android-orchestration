@@ -337,11 +337,13 @@ func cvdOutput(w io.Writer, h *RemoteHost, c *RemoteCVD) {
 
 func adbStateStr(c *RemoteCVD) string {
 	if c.ConnStatus != nil {
-		if c.ConnStatus.ADB.Port > 0 {
-			return fmt.Sprintf("127.0.0.1:%d", c.ConnStatus.ADB.Port)
-		} else {
-			return c.ConnStatus.ADB.State
+		state := c.ConnStatus.ADB.State
+		if state == "connected" || state == "ready" {
+			if c.ConnStatus.ADB.Port > 0 {
+				return fmt.Sprintf("127.0.0.1:%d", c.ConnStatus.ADB.Port)
+			}
 		}
+		return state
 	}
 	return "not connected"
 }
@@ -1580,9 +1582,9 @@ func sendConnectResult(c *command, adbPort int) error {
 		if cout, ok := c.OutOrStdout().(io.Closer); ok {
 			cout.Close()
 		}
-		if cerr, ok := c.ErrOrStderr().(io.Closer); ok {
-			cerr.Close()
-		}
+		// if cerr, ok := c.ErrOrStderr().(io.Closer); ok {
+		// 	cerr.Close()
+		// }
 	})
 	return sendResultErr
 }

@@ -13,3 +13,15 @@ tags
 /bazel-*
 /**/bazel-*
 MODULE.bazel.lock
+
+# CVDR local verification artifacts
+/cmd/cvdr/cvdr
+/cmd/cvdr/cvdr_static
+/cvdr_config.toml
+/cvdr_fixed
+/cvdr_patched
+/cvdr_unfixed
+/startup.sh
+/token.txt
+/vendor/
+

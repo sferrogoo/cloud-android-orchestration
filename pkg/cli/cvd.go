@@ -175,7 +175,7 @@ func (c *cvdCreator) Create() ([]*hoapi.CVD, error) {
 	if !c.opts.CreateCVDLocalOpts.empty() {
 		return c.createCVDFromLocalSrcs()
 	}
-	if c.opts.EnvConfig != nil {
+	if len(c.opts.EnvConfig) > 0 {
 		return c.createWithCanonicalConfig()
 	}
 	return c.createWithOpts()
@@ -361,6 +361,7 @@ func (c *cvdCreator) uploadImagesAndUpdateEnvConfig(client hoclient.HostOrchestr
 	if !ok {
 		return nil
 	}
+	uploadedImages := make(map[string]string)
 	for _, ins := range instancesArr {
 		ins, ok := ins.(map[string]any)
 		if !ok {
@@ -379,6 +380,10 @@ func (c *cvdCreator) uploadImagesAndUpdateEnvConfig(client hoclient.HostOrchestr
 			continue
 		}
 		if val, ok := defaultBuild.(string); ok && !strings.HasPrefix(val, "@ab") {
+			if id, uploaded := uploadedImages[val]; uploaded {
+				diskMap["default_build"] = "@image_dirs/" + id
+				continue
+			}
 			images := strings.Split(val, ",")
 			for _, image := range images {
 				if isDir, err := isDirectory(image); err != nil {
@@ -391,6 +396,7 @@ func (c *cvdCreator) uploadImagesAndUpdateEnvConfig(client hoclient.HostOrchestr
 			if err != nil {
 				return fmt.Errorf("failed uploading %q: %w", images, err)
 			}
+			uploadedImages[val] = imageDirID
 			diskMap["default_build"] = "@image_dirs/" + imageDirID
 		}
 	}
@@ -640,9 +646,6 @@ func verifyCVDHostPackageTar(dir string) error {
 }
 
 func (o *CreateCVDLocalOpts) validate() error {
-	if o.LocalBootloaderSrc == "" && o.LocalImagesZipSrc == "" {
-		return errors.New("missing bootloader source")
-	}
 	if o.LocalCVDHostPkgSrc == "" {
 		return errors.New("missing cvd host package source")
 	}
@@ -720,7 +723,7 @@ func uploadFilesAndCreateImageDir(client hoclient.HostOrchestratorClient, filena
 	statePrinter.PrintDone(msg, merr)
 
 	if merr != nil {
-		return "", err
+		return "", merr
 	}
 
 	return imageDirID, nil

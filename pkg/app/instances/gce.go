@@ -34,6 +34,7 @@ const GCEIMType IMType = "GCP"
 
 type GCPIMConfig struct {
 	ProjectID            string
+        HostSnapshot         string
 	HostImageFamily      string
 	HostOrchestratorPort int
 	Network              string
@@ -83,6 +84,7 @@ func (m *GCEInstanceManager) GetHostAddr(zone string, host string) (string, erro
 	if err != nil {
 		return "", err
 	}
+	// Internal IP is preferred when using VPC connector.
 	ilen := len(instance.NetworkInterfaces)
 	if ilen == 0 {
 		log.Printf("host instance %s in zone %s is missing a network interface", host, zone)
@@ -91,7 +93,9 @@ func (m *GCEInstanceManager) GetHostAddr(zone string, host string) (string, erro
 	if ilen > 1 {
 		log.Printf("host instance %s in zone %s has %d network interfaces", host, zone, ilen)
 	}
-	return instance.NetworkInterfaces[0].NetworkIP, nil
+	addr := instance.NetworkInterfaces[0].NetworkIP
+	log.Printf("Using internal IP %s for host %s (UseExternalIP=%v)", addr, host, m.Config.GCP.UseExternalIP)
+	return addr, nil
 }
 
 func (m *GCEInstanceManager) GetHostURL(zone string, host string) (*url.URL, error) {
@@ -128,10 +132,14 @@ func (m *GCEInstanceManager) CreateHost(zone string, req *apiv1.CreateHostReques
 		AdvancedMachineFeatures: &compute.AdvancedMachineFeatures{
 			EnableNestedVirtualization: true,
 		},
+		Scheduling: &compute.Scheduling{
+			OnHostMaintenance: "TERMINATE",
+		},
 		Disks: []*compute.AttachedDisk{
 			{
 				InitializeParams: &compute.AttachedDiskInitializeParams{
-					SourceImage: m.Config.GCP.HostImageFamily,
+					SourceImage:    m.Config.GCP.HostImageFamily,
+					SourceSnapshot: m.Config.GCP.HostSnapshot,
 				},
 				Boot:       true,
 				AutoDelete: true,
@@ -146,6 +154,9 @@ func (m *GCEInstanceManager) CreateHost(zone string, req *apiv1.CreateHostReques
 		},
 		Labels: map[string]string{
 			labelCreatedBy: user.Username(),
+		},
+		Tags: &compute.Tags{
+			Items: []string{"coast-orchestrator-host"},
 		},
 	}
 	if req.HostInstance.GCP.BootDiskSizeGB != 0 {

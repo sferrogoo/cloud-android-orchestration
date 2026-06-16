@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/cloud-android-orchestration/pkg/cli"
+	"syscall"
 	"golang.org/x/term"
 )
 
@@ -107,8 +108,17 @@ type cmdRunner struct{}
 
 func (*cmdRunner) StartBgCommand(args ...string) ([]byte, error) {
 	cmd := exec.Command(os.Args[0], args...)
-	cmd.Stderr = os.Stderr
+	logFile, err := os.OpenFile("/tmp/cvdr_agent_stderr.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err == nil {
+		cmd.Stderr = logFile
+		defer logFile.Close()
+	} else {
+		cmd.Stderr = os.Stderr
+	}
 	cmd.Stdin = os.Stdin
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
 	pipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pipe: %w", err)
@@ -117,7 +127,7 @@ func (*cmdRunner) StartBgCommand(args ...string) ([]byte, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("unable to start command: %w", err)
 	}
-	defer cmd.Process.Release()
+	// defer cmd.Process.Release()
 	output, err := io.ReadAll(pipe)
 	if err != nil {
 		return nil, fmt.Errorf("error reading command output: %v", err)
